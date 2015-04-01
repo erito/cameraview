@@ -1,105 +1,56 @@
 package com.erikbuttram.cameralib.activities;
 
 import android.app.Activity;
-import android.graphics.SurfaceTexture;
-import android.hardware.Camera;
 import android.os.Bundle;
-import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.TextureView;
+import android.os.Handler;
+import android.view.MotionEvent;
+import android.view.View;
 
 import com.erikbuttram.cameralib.R;
+import com.erikbuttram.cameralib.components.CameraView;
 
-import java.io.IOException;
+public class FullscreenCameraActivity extends Activity {
 
-public class FullScreenCameraActivity extends Activity implements TextureView.SurfaceTextureListener {
+    public static final String TAG = FullscreenCameraActivity.class.getPackage() + " " +
+            FullscreenCameraActivity.class.getSimpleName();
 
-    public static final String TAG = FullScreenCameraActivity.class.getPackage() + " " +
-            FullScreenCameraActivity.class.getSimpleName();
+    /**
+     * Whether or not the system UI should be auto-hidden after
+     * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
+     */
+    private static final boolean AUTO_HIDE = true;
 
-    private Camera currentCamera;
-    private boolean isCameraOpen;
-    private TextureView textureView;
+    /**
+     * If {@link #AUTO_HIDE} is set, the number of milliseconds to wait after
+     * user interaction before hiding the system UI.
+     */
+    private static final int AUTO_HIDE_DELAY_MILLIS = 2000;
+
+    private CameraView mCameraView;
+    private int hideFlags;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_full_screen_camera);
 
-        textureView = (TextureView)findViewById(R.id.preview_surface);
-        //first we'll open the camera
-        try {
-            currentCamera = Camera.open();
-            isCameraOpen = currentCamera != null;
-            if (isCameraOpen) {
-                currentCamera.setPreviewTexture(textureView.getSurfaceTexture());
-                currentCamera.startPreview();
-                currentCamera.startSmoothZoom(1);
-            }
-        } catch (IOException ioEx) {
-            Log.e(TAG, String.format("Unable to initialize camera preview: %s", ioEx.getMessage()));
-        } catch (Exception e) {
-            Log.e(TAG, String.format("Unable to get camera: %s", e.getMessage()));
-            currentCamera = null;
-            isCameraOpen = false;
+        setContentView(R.layout.activity_fullscreen);
+
+        mCameraView = (CameraView)findViewById(R.id.preview_surface);
+
+        hideFlags = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+
+
+        getWindow().getDecorView().setSystemUiVisibility(hideFlags);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+
+        if (hasFocus) {
+            getWindow().getDecorView().setSystemUiVisibility(hideFlags);
         }
-
     }
 
-    @Override
-    public void onStop() {
-        releaseResources();
-        super.onStop();
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_full_screen_camera, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
-    }
-
-    private void releaseResources() {
-        currentCamera.release();
-    }
-
-    @Override
-    public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-
-    }
-
-    @Override
-    public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-
-    }
-
-    @Override
-    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-        if (isCameraOpen) {
-            currentCamera.stopPreview();
-            currentCamera.release();
-        }
-        return false;
-    }
-
-    @Override
-    public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-
-    }
 }

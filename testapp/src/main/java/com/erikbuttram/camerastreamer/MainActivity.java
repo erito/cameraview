@@ -8,8 +8,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 
-import com.erikbuttram.cameralib.Constants;
-import com.erikbuttram.cameralib.activities.FullScreenCameraActivity;
+import com.erikbuttram.cameralib.activities.FullscreenCameraActivity;
 
 
 public class MainActivity extends ActionBarActivity {
@@ -24,7 +23,7 @@ public class MainActivity extends ActionBarActivity {
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, FullScreenCameraActivity.class);
+                Intent intent = new Intent(MainActivity.this, FullscreenCameraActivity.class);
                 startActivity(intent);
             }
         });
