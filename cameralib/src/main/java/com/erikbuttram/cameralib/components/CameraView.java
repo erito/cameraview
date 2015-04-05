@@ -215,6 +215,10 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
         params.setFocusAreas(null);
         params.setMeteringAreas(null);
         params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
+        if (mCurrentCamera.getParameters().isVideoStabilizationSupported()) {
+            params.setVideoStabilization(true);
+        }
+
         mCurrentCamera.setParameters(params);
         if (mEnableShutter && Build.VERSION.SDK_INT > Build.VERSION_CODES.JELLY_BEAN_MR1) {
             mCurrentCamera.enableShutterSound(true);
