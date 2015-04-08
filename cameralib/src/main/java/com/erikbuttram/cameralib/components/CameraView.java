@@ -15,6 +15,7 @@ import android.view.TextureView;
 import android.view.WindowManager;
 
 import com.erikbuttram.cameralib.R;
+import com.erikbuttram.cameralib.enums.CameraPosition;
 
 import java.io.IOException;
 import java.util.List;
@@ -23,7 +24,8 @@ import java.util.List;
  * Created by erikb on 3/31/15.
  * TODO:  Need to figure out shutter callback, two other callbacks for this
  */
-public class CameraView extends TextureView implements TextureView.SurfaceTextureListener, Camera.AutoFocusCallback, Camera.OnZoomChangeListener {
+public class CameraView extends TextureView implements TextureView.SurfaceTextureListener,
+        Camera.AutoFocusCallback {
 
     public static final String TAG = CameraView.class.getPackage() + " " +
             CameraView.class.getSimpleName();
@@ -78,8 +80,8 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
      *  whenever {@link com.erikbuttram.cameralib.components.CameraView#takePicture()}
      *  is invoked, otherwise, when a preview is hit, nothing happens.
      */
-    public void setPictureCallback(Camera.PictureCallback newCallback) {
-        this.pictureCallback = newCallback;
+    public void setShutterCallback(Camera.PictureCallback newCallback) {
+        this.shutterCallback = newCallback;
     }
 
     /**
@@ -87,19 +89,29 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
      */
     private Camera mCurrentCamera;
 
+
     /**
      *  Returns the Camera Info of the current camera
      */
     private Camera.CameraInfo mCameraInfo;
     private boolean mIsCameraOpen;
+    private CameraPosition mCurrentPos;
     private int mCurrentCameraId;
     private boolean mZoomEnabled = true;
     private boolean mAutoFocusEnabled = true;
     private boolean mEnableShutter = true;
-    private Camera.PictureCallback pictureCallback;
 
     private ScaleGestureDetector mScaleGestureDetector;
     private CameraZoomListener mZoomListener;
+
+    /**Picture taking callbacks, we are deliberately not using postview due to it's limitation on
+     * certain hardware.
+     * Eventually, this will be replaced with a library that uses {@link android.hardware.camera2}
+     * Libraries
+     */
+    private Camera.PictureCallback shutterCallback;
+    private Camera.PictureCallback rawCallback;
+    private Camera.PictureCallback jpegCallback;
 
     private void setAttributes(AttributeSet attributeSet) {
         TypedArray array = getContext().getTheme().obtainStyledAttributes(
@@ -109,12 +121,8 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
                 0);
 
         mZoomEnabled = array.getBoolean(R.styleable.CameraView_zoomEnabled, true);
-        boolean cycleToFront = array.getInteger(R.styleable.CameraView_cameraPosition, 0) != 0;
-        if (cycleToFront) {
-            setCameraPosition(Camera.CameraInfo.CAMERA_FACING_FRONT);
-        } else {
-            setCameraPosition(Camera.CameraInfo.CAMERA_FACING_BACK);
-        }
+        int currentPosInt = array.getInteger(R.styleable.CameraView_cameraPosition, 0);
+        mCurrentPos = currentPosInt == 0 ? CameraPosition.Back : CameraPosition.Front;
         mAutoFocusEnabled = array.getBoolean(R.styleable.CameraView_autoFocus, true);
         mEnableShutter = array.getBoolean(R.styleable.CameraView_enableShutter, true);
     }
@@ -123,11 +131,14 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
     private void init() {
         mCurrentCamera = null;
         mCurrentCameraId = ID_NONE;
+        mCurrentPos = CameraPosition.Back;
         mCameraInfo = new Camera.CameraInfo();
         setSurfaceTextureListener(this);
         mZoomListener = new CameraZoomListener();
         mScaleGestureDetector = new ScaleGestureDetector(getContext(), mZoomListener);
-        pictureCallback = null;
+        shutterCallback = null;
+        rawCallback = null;
+        jpegCallback = null;
     }
 
     public CameraView(Context context) {
@@ -142,7 +153,6 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
     }
 
     public void releaseCamera() {
-        mCurrentCamera.setZoomChangeListener(null);
         mCurrentCamera.stopPreview();
         mCurrentCamera.release();
     }
@@ -156,19 +166,40 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
     }
 
     @Override
+    public void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+
+        Log.d(TAG, "I B Detachin");
+        if (mCurrentCamera != null) {
+            mCurrentCamera.release();
+        }
+    }
+
+    @Override
+    public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        Log.d(TAG, "Attached to window was called");
+    }
+
+    @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
 
         if (mCurrentCamera == null) {
-            //Default to the back facing position if it hasn't been set
-            setCameraPosition(Camera.CameraInfo.CAMERA_FACING_BACK);
+            setCameraPosition(mCurrentPos);
+        } else {
+            try {
+                //we're resuming, just start the preview again
+                mCurrentCamera = Camera.open(mCurrentCameraId);
+                mCurrentCamera.startPreview();
+                adjustRotation();
+            } catch (RuntimeException sadDays) {
+                mIsCameraOpen = false;
+            }
         }
         try {
             if (mIsCameraOpen) {
                 Camera.getCameraInfo(mCurrentCameraId, mCameraInfo);
                 mCurrentCamera.setPreviewTexture(getSurfaceTexture());
-                List<Camera.Size> previewSizes = mCurrentCamera.getParameters().getSupportedPreviewSizes();
-                //TODO:  Need to set the preview sizes based off of deltas to the size of Surface Texture
-                adjustRotation();
                 mCurrentCamera.startPreview();
             }
         } catch (IOException ioEx) {
@@ -176,6 +207,41 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
             mCurrentCamera = null;
             mIsCameraOpen = false;
         }
+    }
+
+    @Override
+    public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+        Log.d(TAG, String.format("this is the new size dawg: %d w %d h", width, height));
+    }
+
+    @Override
+    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+
+        if (mIsCameraOpen) {
+            releaseCamera();
+        }
+        return true;
+    }
+
+    @Override
+    public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+
+    }
+
+    @Override
+    public void onAutoFocus(boolean success, Camera camera) {
+
+    }
+
+    private void setPreviewSize(int width, int height) {
+
+        List<Camera.Size> previewSizes = mCurrentCamera.getParameters().getSupportedPreviewSizes();
+        float[] areas = new float[previewSizes.size()];
+        int i = 0;
+        for (Camera.Size size : previewSizes) {
+            //TODO:  Continue here.
+        }
+
     }
 
     private void adjustRotation() {
@@ -207,22 +273,37 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
     //NOTE:  These are some sane defaults that seem to work ok across different platforms
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR1)
     private void setInternalParams() {
+        //TODO:  Pretty limited so far.  maybe more parameters can be set here?
         if (mCurrentCamera == null) {
             return;
         }
         Camera.Parameters params = mCurrentCamera.getParameters();
         //let the driver do the focusing for us
-        params.setFocusAreas(null);
-        params.setMeteringAreas(null);
         params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
         if (mCurrentCamera.getParameters().isVideoStabilizationSupported()) {
             params.setVideoStabilization(true);
         }
-
         mCurrentCamera.setParameters(params);
         if (mEnableShutter && Build.VERSION.SDK_INT > Build.VERSION_CODES.JELLY_BEAN_MR1) {
             mCurrentCamera.enableShutterSound(true);
         }
+    }
+
+    /**
+     * <p>
+     *      Toggles the camera position
+     * </p>
+     *
+     * <p>
+     *     For example, if the Current Camera in use is back, it will attempt to
+     *     connect to the front camera, and vice versa
+     * </p>
+     * @return true if the view successfully swapped out the camera, false if no camera
+     * was available or the parameter passed was invalid.
+     */
+    public boolean toggleCameraPosition() {
+        return setCameraPosition(mCurrentPos == CameraPosition.Back ? CameraPosition.Front :
+                CameraPosition.Back);
     }
 
     /**
@@ -231,32 +312,39 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
      * @return true if the view successfully swapped out the camera, false if no front facing camera
      * was available or the parameter passed was invalid
      */
-    public boolean setCameraPosition(int facing) {
-        if (facing != Camera.CameraInfo.CAMERA_FACING_FRONT &&
-                facing != Camera.CameraInfo.CAMERA_FACING_BACK) {
+    public boolean setCameraPosition(CameraPosition facing) {
+        //TODO:  This method is fairly heavyweight, might be good to move off the main thread
+        int facingInt = facing.ordinal();
+        if (facingInt != Camera.CameraInfo.CAMERA_FACING_FRONT &&
+                facingInt != Camera.CameraInfo.CAMERA_FACING_BACK) {
             return false;
         }
         Camera.CameraInfo inspect = new Camera.CameraInfo();
         for (int idx = 0; idx < Camera.getNumberOfCameras(); idx++) {
             Camera.getCameraInfo(idx, inspect);
-            if (inspect.facing == facing) {
-                if (mCurrentCameraId != ID_NONE) {
-                    releaseCamera();
-                }
+            if (inspect.facing == facingInt) {
                 try {
+                    if (mCurrentCameraId != ID_NONE) {
+                        //no longer needs a preview texture listener
+                        releaseCamera();
+                    }
                     mCurrentCamera = Camera.open(idx);
+                    mCurrentPos = facing;
                     mCurrentCameraId = idx;
                     mIsCameraOpen = true;
+                    mCurrentCamera.setPreviewTexture(getSurfaceTexture());
                     mCurrentCamera.startPreview();
                     mCameraInfo = inspect;
                     if (mCurrentCamera.getParameters().isZoomSupported() && mZoomEnabled) {
                         mZoomListener.setMaxZoom(mCurrentCamera.getParameters().getMaxZoom());
-                        mCurrentCamera.setZoomChangeListener(this);
                     }
+                    adjustRotation();
                     setInternalParams();
                     mCurrentCamera.autoFocus(this);
+                    return true;
                 } catch (Exception ex) {
                     //presumably this one works
+                    Log.e(TAG, String.format("Error initializing camera: %s", ex.getMessage()));
                     mIsCameraOpen = false;
                     return false;
                 }
@@ -274,42 +362,6 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
     }
 
     public void takePicture() {
-
-    }
-
-    @Override
-    public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-
-    }
-
-    @Override
-    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-
-        if (mIsCameraOpen) {
-            releaseCamera();
-        }
-        return true;
-    }
-
-    @Override
-    public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-        //TODO:  Maybe apply some cool filter effects here
-
-    }
-
-    @Override
-    public void onAutoFocus(boolean success, Camera camera) {
-
-    }
-
-    @Override
-    public void onZoomChange(int zoomValue, boolean stopped, Camera camera) {
-
-        //TODO: This seems to crash once in a while.
-        if (camera != null && stopped) {
-            camera.cancelAutoFocus();
-            camera.autoFocus(this);
-        }
 
     }
 
