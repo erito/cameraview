@@ -169,9 +169,9 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
     public void onDetachedFromWindow() {
         super.onDetachedFromWindow();
 
-        Log.d(TAG, "I B Detachin");
         if (mCurrentCamera != null) {
             mCurrentCamera.release();
+            mIsCameraOpen = false;
         }
     }
 
@@ -190,7 +190,7 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
             try {
                 //we're resuming, just start the preview again
                 mCurrentCamera = Camera.open(mCurrentCameraId);
-                mCurrentCamera.startPreview();
+                mIsCameraOpen = true;
                 adjustRotation();
             } catch (RuntimeException sadDays) {
                 mIsCameraOpen = false;
@@ -200,6 +200,7 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
             if (mIsCameraOpen) {
                 Camera.getCameraInfo(mCurrentCameraId, mCameraInfo);
                 mCurrentCamera.setPreviewTexture(getSurfaceTexture());
+
                 mCurrentCamera.startPreview();
             }
         } catch (IOException ioEx) {
@@ -211,7 +212,14 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
 
     @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-        Log.d(TAG, String.format("this is the new size dawg: %d w %d h", width, height));
+        if (mIsCameraOpen) {
+            Camera.Parameters params = mCurrentCamera.getParameters();
+            Camera.Size newSize = getPreviewSize(width, height);
+            params.setPreviewSize(newSize.width, newSize.height);
+            requestLayout();
+            mCurrentCamera.setParameters(params);
+            mCurrentCamera.startPreview();
+        }
     }
 
     @Override
@@ -233,23 +241,82 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
 
     }
 
-    private void setPreviewSize(int width, int height) {
+    /**
+     * returns the preview size to use
+     * @param width
+     * @param height
+     * @return 2 index int array with int[0] = width int[1] = height
+     */
+    private Camera.Size getPreviewSize(int width, int height) {
 
         List<Camera.Size> previewSizes = mCurrentCamera.getParameters().getSupportedPreviewSizes();
-        float[] areas = new float[previewSizes.size()];
+        int[] areas = new int[previewSizes.size()];
         int i = 0;
+        int area = width * height;
+        //we'll go recursive, its not ideal but this set is miniscule
         for (Camera.Size size : previewSizes) {
-            //TODO:  Continue here.
+            int localArea = size.height * size.width;
+            areas[i] = localArea;
+            i++;
+        }
+        int smallest = Integer.MAX_VALUE;
+        int selectedIdx = -1;
+        i = 0;
+        for (int k : areas) {
+            int difference = Math.abs(area - k);
+            if (difference < smallest) {
+                selectedIdx = i;
+                smallest = difference;
+            }
+            i++;
+        }
+        return previewSizes.get(selectedIdx);
+        /*
+if (selSize.height == height && selSize.width == width) {
+            //we're done here
+            return new int[] { width, height};
         }
 
+        float arSurface = (float)width / (float)height;
+        float arPreview = (float)selSize.width / (float)selSize.height;
+        int selHeight;
+        int selWidth;
+
+        if (selSize.height <= height) {
+            selHeight = selSize.height;
+            if (selSize.width == width) {
+                return new int[] { selSize.width, selHeight };
+            }
+            selWidth = (int)(((float)selHeight / (float)selSize.width) * (float)selHeight);
+        } else {
+            selWidth = selSize.width;
+            selHeight = (int)((float)selSize.height / (float)selWidth) * selWidth;
+        }
+
+        return new int[] {
+                selWidth, selHeight
+        };
+*/
     }
 
-    private void adjustRotation() {
-        //reconcile the current screen orientation with the camera view
+    private int getDisplayRotation() {
+        if (getContext() == null) {
+            return NO_ID;
+        }
         WindowManager manager = (WindowManager)getContext().getSystemService(Context.WINDOW_SERVICE);
         if (manager != null) {
             //set the orientation.
             int rotation = manager.getDefaultDisplay().getRotation();
+            return rotation;
+        }
+        return NO_ID;
+    }
+
+    private void adjustRotation() {
+        //reconcile the current screen orientation with the camera view
+        int rotation = getDisplayRotation();
+        if (rotation != NO_ID) {
+            //set the orientation.
             int degrees = 0;
             switch (rotation) {
                 case Surface.ROTATION_0: degrees = 0; break;
