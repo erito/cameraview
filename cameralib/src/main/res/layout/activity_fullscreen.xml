@@ -21,8 +21,8 @@
     <RelativeLayout
         android:layout_gravity="bottom"
         android:background="@color/transparent"
-        android:layout_marginBottom="48dp"
         android:layout_width="match_parent"
+        android:layout_marginBottom="48dp"
         android:layout_height="wrap_content">
 
         <LinearLayout
@@ -44,6 +44,7 @@
             android:layout_height="wrap_content">
 
             <ImageView
+                android:id="@+id/other_mode"
                 android:src="@drawable/video_small"
                 android:layout_width="24dp"
                 android:layout_height="24dp" />
@@ -57,10 +58,10 @@
 
         </LinearLayout>
 
-        <ImageButton
+        <com.erikbuttram.cameralib.components.ActionView
             android:id="@+id/primary_camera"
-            android:src="@drawable/camera"
             android:layout_width="wrap_content"
+            android:paddingTop="10dp"
             android:layout_height="wrap_content"
             android:layout_centerInParent="true"
             android:layout_centerHorizontal="true"

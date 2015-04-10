@@ -1,5 +1,9 @@
 package com.erikbuttram.cameralib.activities;
 
+import android.animation.Animator;
+import android.animation.AnimatorInflater;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -11,16 +15,20 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.TypedValue;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 
 import com.erikbuttram.cameralib.Constants;
 import com.erikbuttram.cameralib.R;
+import com.erikbuttram.cameralib.components.ActionView;
 import com.erikbuttram.cameralib.components.CameraView;
-import com.erikbuttram.cameralib.enums.CameraPosition;
 
 public class FullscreenCameraActivity extends Activity {
 
@@ -36,7 +44,8 @@ public class FullscreenCameraActivity extends Activity {
 
     private CameraView mCameraView;
     private LinearLayout mSwitchModeView;
-    private ImageView mActionView;
+    private ActionView mActionView;
+    private ImageView mOtherMode;
     private ImageButton mSwitchCameraView;
 
     private MediaMode mCurrentMode;
@@ -50,8 +59,9 @@ public class FullscreenCameraActivity extends Activity {
 
         mCameraView = (CameraView)findViewById(R.id.preview_surface);
         mSwitchCameraView = (ImageButton)findViewById(R.id.switch_cameras);
-        mActionView = (ImageView)findViewById(R.id.primary_camera);
+        mActionView = (ActionView)findViewById(R.id.primary_camera);
         mSwitchModeView = (LinearLayout)findViewById(R.id.switch_mode_other);
+        mOtherMode = (ImageView)findViewById(R.id.other_mode);
 
         mHideFlags = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -61,10 +71,14 @@ public class FullscreenCameraActivity extends Activity {
 
         if (modeKey == null || modeKey.equals(Constants.KEY_IMAGE_CAPTURE)) {
             mCurrentMode = MediaMode.Picture;
-            mActionView.setImageBitmap(getActionDrawable(R.drawable.camera_small, this));
+            //mActionView.setImageBitmap(setActionDrawable(R.drawable.camera_small, this, false));
+            mOtherMode.setImageResource(R.drawable.video_small);
+            mActionView.setDrawableFrom(R.drawable.camera_small);
         } else {
             mCurrentMode = MediaMode.Video;
-            mActionView.setImageBitmap(getActionDrawable(R.drawable.video_small, this));
+            //mActionView.setImageBitmap(setActionDrawable(R.drawable.video_small, this, false));
+            mOtherMode.setImageResource(R.drawable.camera_small);
+            mActionView.setDrawableFrom(R.drawable.video_small);
         }
 
         mSwitchCameraView.setOnClickListener(new View.OnClickListener() {
@@ -75,8 +89,21 @@ public class FullscreenCameraActivity extends Activity {
             }
         });
 
-        getWindow().getDecorView().setSystemUiVisibility(mHideFlags);
+        mSwitchModeView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (mCurrentMode == MediaMode.Picture) {
+                    mCurrentMode = MediaMode.Video;
+                    mActionView.setDrawableFrom(R.drawable.video_small);
+                } else {
+                    mCurrentMode = MediaMode.Picture;
+                    mActionView.setDrawableFrom(R.drawable.camera_small);
+                }
+                toggleIcons();
+            }
+        });
 
+        getWindow().getDecorView().setSystemUiVisibility(mHideFlags);
     }
 
     @Override
@@ -87,35 +114,22 @@ public class FullscreenCameraActivity extends Activity {
         }
     }
 
+    private void toggleIcons() {
+        int lonAnimTime = getResources().getInteger(android.R.integer.config_longAnimTime);
 
-    private Bitmap getActionDrawable(int actionDrawable, Context context) {
-        float dimen = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 76,
-                context.getResources().getDisplayMetrics());
-        float innerDimen = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 70,
-                context.getResources().getDisplayMetrics());
+        ObjectAnimator animVanish = ObjectAnimator.ofFloat(mOtherMode, "alpha", 1f, 0f);
+        ObjectAnimator animReappear = ObjectAnimator.ofFloat(mOtherMode, "alpha", 0f, 1f);
+        animVanish.setDuration(lonAnimTime);
+        animReappear.setDuration(lonAnimTime);
+        animVanish.start();
 
-        Bitmap output = Bitmap.createBitmap((int)dimen, (int)dimen, Bitmap.Config.ARGB_8888);
-        Bitmap input = BitmapFactory.decodeResource(context.getResources(), actionDrawable);
-        Canvas canvas = new Canvas(output);
+        if (mCurrentMode == MediaMode.Picture) {
+            mOtherMode.setImageResource(R.drawable.video_small);
+        } else {
+            mOtherMode.setImageResource(R.drawable.camera_small);
+        }
 
-        final Paint paint = new Paint();
-        final Rect rect = new Rect(0, 0, (int)dimen, (int)dimen);
-
-        float halfX = input.getWidth() / 2;
-        float halfY = input.getHeight() / 2;
-
-        int left = (int) (rect.centerX() - halfX);
-        int top = (int) (rect.centerY() - halfY);
-
-        paint.setAntiAlias(true);
-        canvas.drawARGB(0, 0, 0, 0);
-        paint.setColor(Color.argb(255, 255, 255, 255));
-        canvas.drawCircle(rect.width() / 2 + 0.7f, rect.height() / 2 + 0.7f, dimen / 2 + 0.1f, paint);
-        paint.setColor(Color.argb(255, 0, 0, 0));
-        canvas.drawCircle(rect.width() / 2 + 0.7f, rect.height() / 2 + 0.7f, innerDimen / 2 + 0.1f, paint);
-        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_ATOP));
-        canvas.drawBitmap(input, left, top, paint);
-
-        return output;
+        animReappear.start();
     }
+
 }

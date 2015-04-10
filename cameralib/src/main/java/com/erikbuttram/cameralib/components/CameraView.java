@@ -23,6 +23,9 @@ import java.util.List;
 /**
  * Created by erikb on 3/31/15.
  * TODO:  Need to figure out shutter callback, two other callbacks for this
+ * TODO:  We'll abstract the callbacks away as an api call, need a handler and
+ * executor service to attach the camera, as well as provide an abstract class
+ * To do the recording
  */
 public class CameraView extends TextureView implements TextureView.SurfaceTextureListener,
         Camera.AutoFocusCallback {
