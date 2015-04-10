@@ -18,7 +18,6 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 
 import com.erikbuttram.cameralib.R;
 
@@ -35,10 +34,15 @@ public class ActionView extends ImageButton {
     public static final String TAG = ActionView.class.getPackage() + " " +
             ActionView.class.getSimpleName();
 
+    public void setOnActionListener(OnActionViewExecutedListener mListener) {
+        this.mListener = mListener;
+    }
+
     private OnActionViewExecutedListener mListener;
+    private int drawableId;
 
     private void init() {
-
+        mListener = null;
     }
 
     public ActionView(Context context) {
@@ -64,36 +68,35 @@ public class ActionView extends ImageButton {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
 
-        Log.d(TAG, "Im getting something here");
-
+        //only care about the first'n
         if (event.getActionMasked() == MotionEvent.ACTION_UP) {
-            Log.d(TAG, "On Action up was pressed");
-        } else if (event.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN) {
-            Log.d(TAG, "On Action Down Down down");
+            //trigger event and animation
+            activeAnimation(R.animator.anim_camera_btn_inactive);
+            setImageBitmap(setActionDrawable(false));
+            if (mListener != null) {
+                mListener.onActionViewExecuted();
+            }
         } else if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
-            Log.d(TAG, "On Action Down pressed");
-        } else if (event.getActionMasked() == MotionEvent.ACTION_POINTER_UP) {
-            Log.d(TAG, "On Action Pointer Up");
+            setImageBitmap(setActionDrawable(true));
+            activeAnimation(R.animator.anim_camera_btn_active);
         }
 
         return super.onTouchEvent(event);
     }
 
     public void setDrawableFrom(int drawable) {
-        setImageBitmap(setActionDrawable(drawable, false));
+        drawableId = drawable;
+        setImageBitmap(setActionDrawable(false));
     }
 
-    public void toggleAction(int drawable, boolean active) {
-    }
-
-    private Bitmap setActionDrawable(int actionDrawable, boolean active) {
+    private Bitmap setActionDrawable(boolean active) {
         float dimen = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 72,
                 getContext().getResources().getDisplayMetrics());
         float innerDimen = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 68,
                 getContext().getResources().getDisplayMetrics());
 
         Bitmap output = Bitmap.createBitmap((int)dimen, (int)dimen, Bitmap.Config.ARGB_8888);
-        Bitmap input = BitmapFactory.decodeResource(getContext().getResources(), actionDrawable);
+        Bitmap input = BitmapFactory.decodeResource(getContext().getResources(), drawableId);
         Canvas canvas = new Canvas(output);
 
         final Paint paint = new Paint();
@@ -122,9 +125,9 @@ public class ActionView extends ImageButton {
         return output;
     }
 
-    private void activeAnimation() {
+    private void activeAnimation(int animatorId) {
         Animator animator = AnimatorInflater.loadAnimator(getContext(),
-                R.animator.anim_camera_action);
+                animatorId);
         animator.setTarget(this);
         animator.start();
     }

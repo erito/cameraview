@@ -22,10 +22,6 @@ import java.util.List;
 
 /**
  * Created by erikb on 3/31/15.
- * TODO:  Need to figure out shutter callback, two other callbacks for this
- * TODO:  We'll abstract the callbacks away as an api call, need a handler and
- * executor service to attach the camera, as well as provide an abstract class
- * To do the recording
  */
 public class CameraView extends TextureView implements TextureView.SurfaceTextureListener,
         Camera.AutoFocusCallback {
@@ -427,12 +423,16 @@ if (selSize.height == height && selSize.width == width) {
      * Invokes the {@link Camera#takePicture(android.hardware.Camera.ShutterCallback, android.hardware.Camera.PictureCallback, android.hardware.Camera.PictureCallback)}
      * @param callback
      */
-    public void takePicture(Camera.PictureCallback callback) {
-
-    }
-
-    public void takePicture() {
-
+    public void takePicture(final Camera.PictureCallback callback) {
+        if (mIsCameraOpen) {
+            mCurrentCamera.stopPreview();
+            mCurrentCamera.takePicture(null,new Camera.PictureCallback() {
+                @Override
+                public void onPictureTaken(byte[] data, Camera camera) {
+                    //Curiously, at least sony crashes when this callback is null
+                }
+            }, callback);
+        }
     }
 
     private class CameraZoomListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
@@ -457,7 +457,6 @@ if (selSize.height == height && selSize.width == width) {
 
         @Override
         public boolean onScaleBegin(ScaleGestureDetector detector) {
-
             useParams = mCurrentCamera.getParameters();
             return true;
         }

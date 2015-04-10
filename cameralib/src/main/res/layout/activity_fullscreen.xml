@@ -22,16 +22,16 @@
         android:layout_gravity="bottom"
         android:background="@color/transparent"
         android:layout_width="match_parent"
-        android:layout_marginBottom="48dp"
+        android:layout_marginBottom="28dp"
         android:layout_height="wrap_content">
 
         <LinearLayout
             android:orientation="vertical"
             android:id="@+id/switch_mode_other"
             android:background="@drawable/bg_square"
+            android:layout_alignBottom="@+id/primary_camera"
             android:layout_alignParentStart="true"
             android:layout_alignParentLeft="true"
-            android:layout_centerVertical="true"
             android:layout_marginStart="24dp"
             android:layout_marginLeft="24dp"
             android:paddingStart="10dp"
@@ -65,6 +65,7 @@
             android:layout_height="wrap_content"
             android:layout_centerInParent="true"
             android:layout_centerHorizontal="true"
+            android:layout_marginBottom="18dp"
             android:background="@color/transparent"
              />
 

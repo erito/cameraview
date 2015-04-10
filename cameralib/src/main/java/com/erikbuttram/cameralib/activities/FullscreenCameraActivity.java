@@ -1,26 +1,12 @@
 package com.erikbuttram.cameralib.activities;
 
-import android.animation.Animator;
-import android.animation.AnimatorInflater;
-import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.app.Activity;
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffXfermode;
-import android.graphics.Rect;
+import android.hardware.Camera;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
-import android.util.TypedValue;
-import android.view.MotionEvent;
 import android.view.View;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -30,9 +16,19 @@ import com.erikbuttram.cameralib.R;
 import com.erikbuttram.cameralib.components.ActionView;
 import com.erikbuttram.cameralib.components.CameraView;
 
-public class FullscreenCameraActivity extends Activity {
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
-    public static final String TAG = FullscreenCameraActivity.class.getPackage() + " " +
+public class FullscreenCameraActivity extends Activity implements ActionView.OnActionViewExecutedListener, Camera.PictureCallback {
+
+    public static final String MEDIA_OUT_KEY = "com.erikbuttram.output_media_key";
+
+    public static final int RESULT_MEDIA_ACTION_FAILED = 0x100;
+    public static final int RESULT_MEDIA_ACTION_SUCCESS = 0x010;
+
+    private static final String TAG = FullscreenCameraActivity.class.getPackage() + " " +
             FullscreenCameraActivity.class.getSimpleName();
 
     private enum MediaMode {
@@ -50,6 +46,7 @@ public class FullscreenCameraActivity extends Activity {
 
     private MediaMode mCurrentMode;
     private boolean isRecording = false;
+    private File outputFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,6 +65,12 @@ public class FullscreenCameraActivity extends Activity {
                 | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
 
         String modeKey = getIntent().getStringExtra(Constants.OPTION_MEDIA_TYPE);
+        if (getIntent().getParcelableExtra(MEDIA_OUT_KEY) == null) {
+            outputFile = null;
+        } else {
+            Uri locUri = getIntent().getParcelableExtra(MEDIA_OUT_KEY);
+            outputFile = new File(locUri.getPath());
+        }
 
         if (modeKey == null || modeKey.equals(Constants.KEY_IMAGE_CAPTURE)) {
             mCurrentMode = MediaMode.Picture;
@@ -103,6 +106,8 @@ public class FullscreenCameraActivity extends Activity {
             }
         });
 
+        mActionView.setOnActionListener(this);
+
         getWindow().getDecorView().setSystemUiVisibility(mHideFlags);
     }
 
@@ -111,6 +116,34 @@ public class FullscreenCameraActivity extends Activity {
 
         if (hasFocus) {
             getWindow().getDecorView().setSystemUiVisibility(mHideFlags);
+        }
+    }
+
+    @Override
+    public void onActionViewExecuted() {
+        if (mCurrentMode == MediaMode.Picture) {
+            mCameraView.takePicture(this);
+        } else {
+            //TODO:  implement
+        }
+    }
+
+    @Override
+    public void onPictureTaken(byte[] data, Camera camera) {
+        if (outputFile == null || data == null) {
+            return;
+        }
+
+        try {
+            FileOutputStream stream = new FileOutputStream(outputFile);
+            stream.write(data);
+            stream.close();
+            setResult(RESULT_MEDIA_ACTION_SUCCESS);
+            finish();
+        } catch (FileNotFoundException fileEx) {
+            Log.d(TAG, "Unable to capture image: file not found");
+        } catch (IOException ioEx) {
+            Log.d(TAG, String.format("IOException occurred while capturing image: %s", ioEx.getMessage()));
         }
     }
 
