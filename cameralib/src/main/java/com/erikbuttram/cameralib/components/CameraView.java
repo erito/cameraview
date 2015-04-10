@@ -6,6 +6,7 @@ import android.content.res.TypedArray;
 import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.os.Build;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -75,12 +76,12 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
     }
 
     /**
-     *  This is the {@link android.hardware.Camera.PictureCallback} that is used
-     *  whenever {@link com.erikbuttram.cameralib.components.CameraView#takePicture()}
-     *  is invoked, otherwise, when a preview is hit, nothing happens.
+     * Used to set the focus mode for the camera view.  The default is
+     * {@link android.hardware.Camera.Parameters#FOCUS_MODE_AUTO}
+     * @param mode
      */
-    public void setShutterCallback(Camera.PictureCallback newCallback) {
-        this.shutterCallback = newCallback;
+    public void setFocusMode(String mode) {
+        this.mFocusSetting = mode;
     }
 
     /**
@@ -97,20 +98,12 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
     private CameraPosition mCurrentPos;
     private int mCurrentCameraId;
     private boolean mZoomEnabled = true;
+    private String mFocusSetting;
     private boolean mAutoFocusEnabled = true;
     private boolean mEnableShutter = true;
 
     private ScaleGestureDetector mScaleGestureDetector;
     private CameraZoomListener mZoomListener;
-
-    /**Picture taking callbacks, we are deliberately not using postview due to it's limitation on
-     * certain hardware.
-     * Eventually, this will be replaced with a library that uses {@link android.hardware.camera2}
-     * Libraries
-     */
-    private Camera.PictureCallback shutterCallback;
-    private Camera.PictureCallback rawCallback;
-    private Camera.PictureCallback jpegCallback;
 
     private void setAttributes(AttributeSet attributeSet) {
         TypedArray array = getContext().getTheme().obtainStyledAttributes(
@@ -135,9 +128,7 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
         setSurfaceTextureListener(this);
         mZoomListener = new CameraZoomListener();
         mScaleGestureDetector = new ScaleGestureDetector(getContext(), mZoomListener);
-        shutterCallback = null;
-        rawCallback = null;
-        jpegCallback = null;
+        mFocusSetting = Camera.Parameters.FOCUS_MODE_AUTO;
     }
 
     public CameraView(Context context) {
@@ -154,6 +145,31 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
     public void releaseCamera() {
         mCurrentCamera.stopPreview();
         mCurrentCamera.release();
+    }
+
+    /**
+     * Basically an internal api that returns the focus mode to use, if any.
+     * @param supported
+     * @return the supported {@link android.hardware.Camera.Parameters#getSupportedFocusModes()} that was specified,
+     * the only focus mode available, AUTO if available, or an empty string (not to set focus mode)
+     */
+    private String setFocusMode(List<String> supported) {
+
+        if (supported.size() == 1) {
+            return supported.get(0);
+        }
+
+        if (supported.size() == 0) {
+            return "";
+        }
+
+        if (supported.contains(mFocusSetting)) {
+            return mFocusSetting;
+        } else if (supported.contains(Camera.Parameters.FOCUS_MODE_AUTO)) {
+            return Camera.Parameters.FOCUS_MODE_AUTO;
+        }
+
+        return supported.get(0);
     }
 
     @Override
@@ -345,7 +361,10 @@ if (selSize.height == height && selSize.width == width) {
         }
         Camera.Parameters params = mCurrentCamera.getParameters();
         //let the driver do the focusing for us
-        params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
+        String focus = setFocusMode(params.getSupportedFocusModes());
+        if (!TextUtils.isEmpty(focus)) {
+            params.setFocusMode(focus);
+        }
         if (mCurrentCamera.getParameters().isVideoStabilizationSupported()) {
             params.setVideoStabilization(true);
         }

@@ -134,6 +134,7 @@ public class FullscreenCameraActivity extends Activity implements ActionView.OnA
             return;
         }
 
+        //TODO:  Need to check the headers of the orientation and match it to the
         try {
             FileOutputStream stream = new FileOutputStream(outputFile);
             stream.write(data);
