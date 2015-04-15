@@ -2,7 +2,9 @@ package com.erikbuttram.cameralib.activities;
 
 import android.animation.ObjectAnimator;
 import android.app.Activity;
+import android.content.pm.ActivityInfo;
 import android.hardware.Camera;
+import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
@@ -24,9 +26,11 @@ import java.io.IOException;
 public class FullscreenCameraActivity extends Activity implements ActionView.OnActionViewExecutedListener, Camera.PictureCallback {
 
     public static final String MEDIA_OUT_KEY = "com.erikbuttram.output_media_key";
+    public static final String VIDEO_MAX_LENGTH_KEY = "com.erikbuttram.output_length_key";
 
     public static final int RESULT_MEDIA_ACTION_FAILED = 0x100;
     public static final int RESULT_MEDIA_ACTION_SUCCESS = 0x010;
+    public static final int LENGTH_NONE = -1;
 
     private static final String TAG = FullscreenCameraActivity.class.getPackage() + " " +
             FullscreenCameraActivity.class.getSimpleName();
@@ -38,14 +42,16 @@ public class FullscreenCameraActivity extends Activity implements ActionView.OnA
 
     private int mHideFlags;
 
+    private int mMaxLength;
     private CameraView mCameraView;
     private LinearLayout mSwitchModeView;
     private ActionView mActionView;
     private ImageView mOtherMode;
     private ImageButton mSwitchCameraView;
+    private MediaRecorder mRecorder;
 
     private MediaMode mCurrentMode;
-    private boolean isRecording = false;
+    private boolean mIsRecording = false;
     private File outputFile;
 
     @Override
@@ -59,6 +65,7 @@ public class FullscreenCameraActivity extends Activity implements ActionView.OnA
         mActionView = (ActionView)findViewById(R.id.primary_camera);
         mSwitchModeView = (LinearLayout)findViewById(R.id.switch_mode_other);
         mOtherMode = (ImageView)findViewById(R.id.other_mode);
+        mRecorder = null;
 
         mHideFlags = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -72,6 +79,7 @@ public class FullscreenCameraActivity extends Activity implements ActionView.OnA
             outputFile = new File(locUri.getPath());
         }
 
+
         if (modeKey == null || modeKey.equals(Constants.KEY_IMAGE_CAPTURE)) {
             mCurrentMode = MediaMode.Picture;
             //mActionView.setImageBitmap(setActionDrawable(R.drawable.camera_small, this, false));
@@ -82,6 +90,13 @@ public class FullscreenCameraActivity extends Activity implements ActionView.OnA
             //mActionView.setImageBitmap(setActionDrawable(R.drawable.video_small, this, false));
             mOtherMode.setImageResource(R.drawable.camera_small);
             mActionView.setDrawableFrom(R.drawable.video_small);
+
+        }
+        if (getIntent().hasExtra(VIDEO_MAX_LENGTH_KEY)) {
+            mMaxLength = getIntent().getIntExtra(VIDEO_MAX_LENGTH_KEY, LENGTH_NONE);
+        } else {
+            mMaxLength = LENGTH_NONE;
+
         }
 
         mSwitchCameraView.setOnClickListener(new View.OnClickListener() {
@@ -112,6 +127,17 @@ public class FullscreenCameraActivity extends Activity implements ActionView.OnA
     }
 
     @Override
+    public void onStop() {
+
+        if (mIsRecording) {
+            mActionView.stopAnimation();
+            mActionView.setDrawableFrom(R.drawable.video_small);
+            mIsRecording = false;
+        }
+        super.onStop();
+    }
+
+    @Override
     public void onWindowFocusChanged(boolean hasFocus) {
 
         if (hasFocus) {
@@ -120,11 +146,26 @@ public class FullscreenCameraActivity extends Activity implements ActionView.OnA
     }
 
     @Override
-    public void onActionViewExecuted() {
+    public void onActionViewInvoked() {
         if (mCurrentMode == MediaMode.Picture) {
             mCameraView.takePicture(this);
         } else {
-            //TODO:  implement
+            if (!mIsRecording) {
+                mSwitchCameraView.setEnabled(false);
+                mSwitchModeView.setEnabled(false);
+                mIsRecording = true;
+                mRecorder = mCameraView.startRecording();
+                if (mRecorder != null) {
+                    setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_NOSENSOR);
+                    mActionView.setDrawableFrom(R.drawable.stop);
+                }
+            } else {
+                mSwitchCameraView.setEnabled(true);
+                mSwitchModeView.setEnabled(true);
+                mIsRecording = false;
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
+                mActionView.setDrawableFrom(R.drawable.video_small);
+            }
         }
     }
 
@@ -134,7 +175,6 @@ public class FullscreenCameraActivity extends Activity implements ActionView.OnA
             return;
         }
 
-        //TODO:  Need to check the headers of the orientation and match it to the
         try {
             FileOutputStream stream = new FileOutputStream(outputFile);
             stream.write(data);
@@ -164,6 +204,15 @@ public class FullscreenCameraActivity extends Activity implements ActionView.OnA
         }
 
         animReappear.start();
+    }
+
+    private class RecorderProgressRunnable implements Runnable {
+
+        @Override
+        public void run() {
+            //TODO:  Finish.
+
+        }
     }
 
 }

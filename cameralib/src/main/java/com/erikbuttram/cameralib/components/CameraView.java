@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
+import android.media.MediaRecorder;
 import android.os.Build;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -188,12 +189,6 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
             mCurrentCamera.release();
             mIsCameraOpen = false;
         }
-    }
-
-    @Override
-    public void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        Log.d(TAG, "Attached to window was called");
     }
 
     @Override
@@ -436,6 +431,24 @@ if (selSize.height == height && selSize.width == width) {
             }
         }
         return true;
+    }
+
+    public MediaRecorder startRecording() {
+
+        if (mCurrentCamera != null) {
+            MediaRecorder recorder = new MediaRecorder();
+            recorder.setCamera(mCurrentCamera);
+            recorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
+            recorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
+            try {
+                recorder.prepare();
+                recorder.start();
+                return recorder;
+            } catch (IOException ioEx) {
+                return null;
+            }
+        }
+        return null;
     }
 
     /**
