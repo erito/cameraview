@@ -24,6 +24,9 @@ import java.util.List;
 
 /**
  * Created by erikb on 3/31/15.
+ * TODO:  This is a big one, we're going to NEED the Camera2 apis to get this library to work on
+ * TODO:  Lollipop, it crashes when we attempt to take a picture, We'll do this by picking strategies
+ * based on API Level
  */
 public class CameraView extends TextureView implements TextureView.SurfaceTextureListener,
         Camera.AutoFocusCallback {
