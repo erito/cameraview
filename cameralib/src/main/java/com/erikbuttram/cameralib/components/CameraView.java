@@ -121,6 +121,7 @@ public class CameraView extends TextureView implements TextureView.SurfaceTextur
         mCurrentPos = currentPosInt == 0 ? CameraPosition.Back : CameraPosition.Front;
         mAutoFocusEnabled = array.getBoolean(R.styleable.CameraView_autoFocus, true);
         mEnableShutter = array.getBoolean(R.styleable.CameraView_enableShutter, true);
+        array.recycle();
     }
 
     //gets called before anything else

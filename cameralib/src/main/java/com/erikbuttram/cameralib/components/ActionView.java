@@ -56,7 +56,7 @@ public class ActionView extends ImageButton {
         mHandler = new Handler(Looper.getMainLooper());
         int longCount = getContext().getResources().getInteger(android.R.integer.config_longAnimTime);
         int sleepCount = 1050;
-        mAnimationRunnable = new AnimationRunnable(sleepCount);
+        mAnimationRunnable = new AnimationRunnable(sleepCount, getContext());
         mIsRecording = false;
     }
 
@@ -198,13 +198,13 @@ public class ActionView extends ImageButton {
         animator.start();
     }
 
-    private class AnimationRunnable implements Runnable {
+    private static class AnimationRunnable implements Runnable {
 
         private int mSleep;
         private boolean mToRed;
 
 
-        public AnimationRunnable(int sleepInterval) {
+        public AnimationRunnable(int sleepInterval, Context context) {
             mToRed = true;
             mSleep = sleepInterval;
         }
