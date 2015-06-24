@@ -15,8 +15,10 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Message;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.MotionEvent;
@@ -32,6 +34,8 @@ import com.erikbuttram.cameralib.R;
  */
 public class ActionView extends ImageButton {
 
+    private static final int MESSAGE_ANIMATE = 0x1;
+    private static final String ANIMATION_OBJ_KEY = "anim_obj_key";
 
     private AnimationRunnable mAnimationRunnable;
 
@@ -48,15 +52,13 @@ public class ActionView extends ImageButton {
 
     private OnActionViewExecutedListener mListener;
     private int mDrawableId;
-    private Handler mHandler; //for the recording animation loop
     private boolean mIsRecording;
 
     private void init() {
         mListener = null;
-        mHandler = new Handler(Looper.getMainLooper());
         int longCount = getContext().getResources().getInteger(android.R.integer.config_longAnimTime);
         int sleepCount = 1050;
-        mAnimationRunnable = new AnimationRunnable(sleepCount, getContext());
+        mAnimationRunnable = new AnimationRunnable(sleepCount, mHandler, getContext());
         mIsRecording = false;
     }
 
@@ -105,7 +107,7 @@ public class ActionView extends ImageButton {
     }
 
     public void stopAnimation() {
-        mHandler.removeCallbacks(mAnimationRunnable);
+        mAnimationRunnable.stop();
     }
 
     public void setDrawableFrom(int drawable) {
@@ -113,11 +115,12 @@ public class ActionView extends ImageButton {
         if (drawable == R.drawable.stop) {
             mIsRecording = true;
             setImageResource(drawable);
-            mHandler.post(mAnimationRunnable);
+            Thread thread = new Thread(mAnimationRunnable);
+            thread.start();
         } else {
             if (mIsRecording) {
                 mIsRecording = false;
-                mHandler.removeCallbacks(mAnimationRunnable);
+                mAnimationRunnable.stop();
             }
             setImageBitmap(setActionDrawable(false));
         }
@@ -198,34 +201,10 @@ public class ActionView extends ImageButton {
         animator.start();
     }
 
-    private static class AnimationRunnable implements Runnable {
-
-        private int mSleep;
-        private boolean mToRed;
-
-
-        public AnimationRunnable(int sleepInterval, Context context) {
-            mToRed = true;
-            mSleep = sleepInterval;
-        }
-
+    private Handler mHandler = new Handler() {
         @Override
-        public void run() {
-            ValueAnimator animator;
-            Integer black = getContext().getResources().getColor(R.color.black);
-            Integer red = getContext().getResources().getColor(R.color.red);
-            if (mToRed) {
-                mToRed = false;
-                animator = ValueAnimator.ofObject(new ArgbEvaluator(), black,
-                    red);
-                animator.setInterpolator(new AccelerateInterpolator());
-            } else {
-                mToRed = true;
-                animator = ValueAnimator.ofObject(new ArgbEvaluator(), red,
-                        black);
-                animator.setInterpolator(new DecelerateInterpolator());
-            }
-            animator.setDuration(1000);
+        public void handleMessage(Message msg) {
+            ValueAnimator animator = (ValueAnimator)msg.obj;
             animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                 @Override
                 public void onAnimationUpdate(ValueAnimator animation) {
@@ -235,7 +214,60 @@ public class ActionView extends ImageButton {
                 }
             });
             animator.start();
-            mHandler.postDelayed(this, mSleep);
+        }
+    };
+
+    private static class AnimationRunnable implements Runnable {
+
+        private int mSleep;
+        private boolean mToRed;
+        private Context mContext;
+        private boolean mStopped;
+        private Handler mHandler;
+
+        public AnimationRunnable(int sleepInterval, Handler handler, Context context) {
+            mToRed = true;
+            mSleep = sleepInterval;
+            mHandler = handler;
+            mContext = context;
+            mStopped = false;
+        }
+
+        public void stop() {
+            mStopped = true;
+        }
+
+        @Override
+        public void run() {
+            mStopped= false;
+            mToRed = true;
+            ValueAnimator animator;
+            Integer black = mContext.getResources().getColor(R.color.black);
+            Integer red = mContext.getResources().getColor(R.color.red);
+            while (mStopped) {
+                if (mToRed) {
+                    mToRed = false;
+                    animator = ValueAnimator.ofObject(new ArgbEvaluator(), black,
+                            red);
+                    animator.setInterpolator(new AccelerateInterpolator());
+                } else {
+                    mToRed = true;
+                    animator = ValueAnimator.ofObject(new ArgbEvaluator(), red,
+                            black);
+                    animator.setInterpolator(new DecelerateInterpolator());
+                }
+                animator.setDuration(1000);
+                Message message = new Message();
+                message.what = MESSAGE_ANIMATE;
+                message.obj = animator;
+                mHandler.sendMessage(message);
+                try {
+                    Thread.sleep(mSleep);
+                } catch (InterruptedException e) {
+                    //ignore
+                }
+            }
+
         }
     }
 }
