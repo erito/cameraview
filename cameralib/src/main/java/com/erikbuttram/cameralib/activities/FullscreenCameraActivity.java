@@ -103,7 +103,7 @@ public class FullscreenCameraActivity extends Activity implements ActionView.OnA
 
             @Override
             public void onClick(View v) {
-                mCameraView.toggleCameraPosition();
+                mCameraView.toggleCamera();
             }
         });
 
