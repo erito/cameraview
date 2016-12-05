@@ -23,7 +23,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
-public class FullscreenCameraActivity extends Activity implements ActionView.OnActionViewExecutedListener, Camera.PictureCallback {
+public class FullscreenCameraActivity extends Activity implements ActionView.OnActionViewExecutedListener,
+        Camera.PictureCallback {
 
     public static final String MEDIA_OUT_KEY = "com.erikbuttram.output_media_key";
     public static final String VIDEO_MAX_LENGTH_KEY = "com.erikbuttram.output_length_key";
